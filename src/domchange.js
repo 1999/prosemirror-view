@@ -4,7 +4,6 @@ const {Mapping} = require("prosemirror-transform")
 
 const {TrackMappings} = require("./trackmappings")
 const {selectionBetween} = require("./selection")
-const {selectionCollapsed} = require("./dom")
 
 class DOMChange {
   constructor(view, composing) {
@@ -110,7 +109,7 @@ function parseBetween(view, oldState, range) {
   let domSel = view.root.getSelection(), find = null, anchor = domSel.anchorNode
   if (anchor && view.dom.contains(anchor.nodeType == 1 ? anchor : anchor.parentNode)) {
     find = [{node: anchor, offset: domSel.anchorOffset}]
-    if (!selectionCollapsed(domSel))
+    if (!domSel.isCollapsed)
       find.push({node: domSel.focusNode, offset: domSel.focusOffset})
   }
   let startDoc = oldState.doc
@@ -154,10 +153,9 @@ function isAtStart($pos, depth) {
 }
 
 function rangeAroundSelection(selection) {
-  // Intentionally uses $head/$anchor because those will correspond to the DOM selection
-  let $from = selection.$anchor.min(selection.$head), $to = selection.$anchor.max(selection.$head)
+  let {$from, $to} = selection
 
-  if ($from.sameParent($to) && $from.parent.inlineContent && $from.parentOffset && $to.parentOffset < $to.parent.content.size) {
+  if ($from.sameParent($to) && $from.parent.isTextblock && $from.parentOffset && $to.parentOffset < $to.parent.content.size) {
     let startOff = Math.max(0, $from.parentOffset)
     let size = $from.parent.content.size
     let endOff = Math.min(size, $to.parentOffset)

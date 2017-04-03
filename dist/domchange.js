@@ -10,8 +10,6 @@ var ref$3 = require("./trackmappings");
 var TrackMappings = ref$3.TrackMappings;
 var ref$4 = require("./selection");
 var selectionBetween = ref$4.selectionBetween;
-var ref$5 = require("./dom");
-var selectionCollapsed = ref$5.selectionCollapsed;
 
 var DOMChange = function(view, composing) {
   var this$1 = this;
@@ -124,7 +122,7 @@ function parseBetween(view, oldState, range) {
   var domSel = view.root.getSelection(), find = null, anchor = domSel.anchorNode
   if (anchor && view.dom.contains(anchor.nodeType == 1 ? anchor : anchor.parentNode)) {
     find = [{node: anchor, offset: domSel.anchorOffset}]
-    if (!selectionCollapsed(domSel))
+    if (!domSel.isCollapsed)
       { find.push({node: domSel.focusNode, offset: domSel.focusOffset}) }
   }
   var startDoc = oldState.doc
@@ -168,10 +166,10 @@ function isAtStart($pos, depth) {
 }
 
 function rangeAroundSelection(selection) {
-  // Intentionally uses $head/$anchor because those will correspond to the DOM selection
-  var $from = selection.$anchor.min(selection.$head), $to = selection.$anchor.max(selection.$head)
+  var $from = selection.$from;
+  var $to = selection.$to;
 
-  if ($from.sameParent($to) && $from.parent.inlineContent && $from.parentOffset && $to.parentOffset < $to.parent.content.size) {
+  if ($from.sameParent($to) && $from.parent.isTextblock && $from.parentOffset && $to.parentOffset < $to.parent.content.size) {
     var startOff = Math.max(0, $from.parentOffset)
     var size = $from.parent.content.size
     var endOff = Math.min(size, $to.parentOffset)

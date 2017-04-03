@@ -3,53 +3,63 @@ var Slice = ref.Slice;
 var Fragment = ref.Fragment;
 var DOMParser = ref.DOMParser;
 var DOMSerializer = ref.DOMSerializer;
-var ref$1 = require("prosemirror-state");
-var NodeSelection = ref$1.NodeSelection;
-
-var browser = require("./browser")
 
 // : (EditorView, Selection, dom.DataTransfer) → Slice
 // Store the content of a selection in the clipboard (or whatever the
 // given data transfer refers to)
 function toClipboard(view, range, dataTransfer) {
   // Node selections are copied using just the node, text selection include parents
-  var slice = range.content(), context = []
-  var content = slice.content;
-  var openLeft = slice.openLeft;
-  var openRight = slice.openRight;
-  while (openLeft > 1 && openRight > 1 && content.childCount == 1 && content.firstChild.childCount == 1) {
-    openLeft--
-    openRight--
-    var node = content.firstChild
-    context.push(node.type.name, node.type.hasRequiredAttrs() ? node.attrs : null)
-    content = node.content
+  var doc = view.state.doc, fullSlice = doc.slice(range.from, range.to, !range.node)
+  var slice = fullSlice, context
+  if (!range.node) {
+    // Shrink slices for non-node selections to hold only the parent
+    // node, store rest in context string, so that other tools don't
+    // get confused
+    var cut = Math.max(0, range.$from.sharedDepth(range.to) - 1)
+    context = sliceContext(slice, cut)
+    var content = slice.content
+    for (var i = 0; i < cut; i++) { content = content.firstChild.content }
+    slice = new Slice(content, slice.openLeft - cut, slice.openRight - cut)
   }
 
   var serializer = view.someProp("clipboardSerializer") || DOMSerializer.fromSchema(view.state.schema)
-  var wrap = document.createElement("div")
-  wrap.appendChild(serializer.serializeFragment(content))
+  var dom = serializer.serializeFragment(slice.content), wrap = document.createElement("div")
+  wrap.appendChild(dom)
   var child = wrap.firstChild.nodeType == 1 && wrap.firstChild
-  if (child) { child.setAttribute("data-pm-context", range instanceof NodeSelection ? "none" : JSON.stringify(context)) }
+  if (child) {
+    if (range.node)
+      { child.setAttribute("data-pm-node-selection", true) }
+    else
+      { child.setAttribute("data-pm-context", context) }
+  }
 
   dataTransfer.clearData()
   dataTransfer.setData("text/html", wrap.innerHTML)
-  dataTransfer.setData("text/plain", content.textBetween(0, content.size, "\n\n"))
-  return slice
+  dataTransfer.setData("text/plain", slice.content.textBetween(0, slice.content.size, "\n\n"))
+  return fullSlice
 }
 exports.toClipboard = toClipboard
+
+var cachedCanUpdateClipboard = null
+function canUpdateClipboard(dataTransfer) {
+  if (cachedCanUpdateClipboard != null) { return cachedCanUpdateClipboard }
+  dataTransfer.setData("text/html", "<hr>")
+  return cachedCanUpdateClipboard = dataTransfer.getData("text/html") == "<hr>"
+}
+exports.canUpdateClipboard = canUpdateClipboard
 
 // : (EditorView, dom.DataTransfer, ?bool, ResolvedPos) → ?Slice
 // Read a slice of content from the clipboard (or drop data).
 function fromClipboard(view, dataTransfer, plainText, $context) {
   var txt = dataTransfer.getData("text/plain")
   var html = dataTransfer.getData("text/html")
+  if (!html && !txt) { return null }
   var dom, inCode = $context.parent.type.spec.code
-  if (!html && (!txt || browser.ie && !(inCode, plainText))) { return null }
   if ((plainText || inCode || !html) && txt) {
     view.someProp("transformPastedText", function (f) { return txt = f(txt); })
     if (inCode) { return new Slice(Fragment.from(view.state.schema.text(txt)), 0, 0) }
     dom = document.createElement("div")
-    txt.trim().split(/(?:\r\n?|\n)+/).forEach(function (block) {
+    txt.split(/(?:\r\n?|\n)+/).forEach(function (block) {
       dom.appendChild(document.createElement("p")).textContent = block
     })
   } else {
@@ -58,12 +68,11 @@ function fromClipboard(view, dataTransfer, plainText, $context) {
   }
 
   var parser = view.someProp("clipboardParser") || view.someProp("domParser") || DOMParser.fromSchema(view.state.schema)
-  var slice = parser.parseSlice(dom, {preserveWhitespace: true, context: $context})
-  var contextNode = dom.querySelector("[data-pm-context]"), context = contextNode && contextNode.getAttribute("data-pm-context")
-  if (context == "none")
+  var slice = parser.parseSlice(dom, {preserveWhitespace: true, context: $context}), context
+  if (dom.querySelector("[data-pm-node-selection]"))
     { slice = new Slice(slice.content, 0, 0) }
-  else if (context)
-    { slice = addContext(slice, context) }
+  else if (context = dom.querySelector("[data-pm-context]"))
+    { slice = addContext(slice, context.getAttribute("data-pm-context")) }
   else // HTML wasn't created by ProseMirror. Make sure top-level siblings are coherent
     { slice = normalizeSiblings(slice, $context) }
   return slice
@@ -156,6 +165,16 @@ function readHTML(html) {
   elt.innerHTML = html
   for (var i = 0; i < depth; i++) { elt = elt.firstChild }
   return elt
+}
+
+function sliceContext(slice, depth) {
+  var result = [], content = slice.content
+  for (var i = 0; i < depth; i++) {
+    var node = content.firstChild
+    result.push(node.type.name, node.type.hasRequiredAttrs() ? node.attrs : null)
+    content = node.content
+  }
+  return JSON.stringify(result)
 }
 
 function addContext(slice, context) {

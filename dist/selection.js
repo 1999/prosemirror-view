@@ -3,8 +3,6 @@ var TextSelection = ref.TextSelection;
 var NodeSelection = ref.NodeSelection;
 
 var browser = require("./browser")
-var ref$1 = require("./dom");
-var selectionCollapsed = ref$1.selectionCollapsed;
 
 // Track the state of the current editor selection. Keeps the editor
 // selection in sync with the DOM selection by polling for changes,
@@ -32,7 +30,7 @@ SelectionReader.prototype.poll = function (origin) { this.poller.poll(origin) };
 
 SelectionReader.prototype.editableChanged = function () {
   if (!this.view.editable) { this.poller.start() }
-  else if (!hasFocusAndSelection(this.view)) { this.poller.stop() }
+  else if (!this.view.hasFocus()) { this.poller.stop() }
 };
 
 // : () → bool
@@ -59,7 +57,7 @@ SelectionReader.prototype.clearDOMState = function () {
 // When the DOM selection changes in a notable manner, modify the
 // current selection state to match.
 SelectionReader.prototype.readFromDOM = function (origin) {
-  if (this.ignoreUpdates || !this.domChanged() || !hasFocusAndSelection(this.view)) { return }
+  if (this.ignoreUpdates || !this.domChanged() || !this.view.hasFocus()) { return }
   if (!this.view.inDOMChange) { this.view.domObserver.flush() }
   if (this.view.inDOMChange) { return }
 
@@ -72,7 +70,7 @@ SelectionReader.prototype.readFromDOM = function (origin) {
   }
   var head = this.view.docView.posFromDOM(domSel.focusNode, domSel.focusOffset)
   var $head = doc.resolve(head), $anchor, selection
-  if (selectionCollapsed(domSel)) {
+  if (domSel.isCollapsed) {
     $anchor = $head
     while (nearestDesc && !nearestDesc.node) { nearestDesc = nearestDesc.parent }
     if (nearestDesc && nearestDesc.node.isAtom && NodeSelection.isSelectable(nearestDesc.node)) {
@@ -84,7 +82,8 @@ SelectionReader.prototype.readFromDOM = function (origin) {
   }
 
   if (!selection) {
-    var bias = origin == "pointer" || this.view.state.selection.head < $head.pos ? 1 : -1
+    var bias = origin == "pointer" ||
+        (this.view.state.selection.head != null && this.view.state.selection.head < $head.pos) ? 1 : -1
     selection = selectionBetween(this.view, $anchor, $head, bias)
   }
   if (head == selection.head && $anchor.pos == selection.anchor)
@@ -120,7 +119,7 @@ SelectionChangePoller.prototype.start = function () {
   if (!this.listening) {
     document.addEventListener("selectionchange", this.readFunc)
     this.listening = true
-    if (hasFocusAndSelection(this.reader.view)) { this.readFunc() }
+    if (this.reader.view.hasFocus()) { this.readFunc() }
   }
 };
 
@@ -174,11 +173,7 @@ function selectionToDOM(view, takeFocus) {
   if (!view.hasFocus()) {
     if (!takeFocus) { return }
     // See https://bugzilla.mozilla.org/show_bug.cgi?id=921444
-    if (browser.gecko && view.editable) {
-      view.selectionReader.ignoreUpdates = true
-      view.dom.focus()
-      view.selectionReader.ignoreUpdates = false
-    }
+    else if (browser.gecko && view.editable) { view.dom.focus() }
   }
 
   var reader = view.selectionReader
@@ -274,9 +269,3 @@ function selectionBetween(view, $anchor, $head, bias) {
     || TextSelection.between($anchor, $head, bias)
 }
 exports.selectionBetween = selectionBetween
-
-function hasFocusAndSelection(view) {
-  if (view.editable && view.root.activeElement != view.dom) { return false }
-  var sel = view.root.getSelection()
-  return sel.rangeCount && view.dom.contains(sel.anchorNode.nodeType == 3 ? sel.anchorNode.parentNode : sel.anchorNode)
-}

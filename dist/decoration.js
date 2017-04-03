@@ -34,24 +34,14 @@ WidgetType.prototype.eq = function (other) {
      compareObjs(this.spec, other.spec))
 };
 
-var warnedAboutInclusive = false
-
 var InlineType = function(attrs, spec) {
   this.spec = spec || noSpec
   this.attrs = attrs
-  if (spec && (spec.inclusiveLeft || spec.inclusiveRight)) {
-    if (!spec.inclusiveStart) { spec.inclusiveStart = spec.inclusiveLeft }
-    if (!spec.inclusiveEnd) { spec.inclusiveEnd = spec.inclusiveRight }
-    if (!warnedAboutInclusive && typeof console != "undefined" && console.warn) {
-      warnedAboutInclusive = true
-      console.warn("The inclusiveLeft and inclusiveRight options to inline decorations are now called inclusiveStart and inclusiveEnd")
-    }
-  }
 };
 
 InlineType.prototype.map = function (mapping, span, offset, oldOffset) {
-  var from = mapping.map(span.from + oldOffset, this.spec.inclusiveStart ? -1 : 1) - offset
-  var to = mapping.map(span.to + oldOffset, this.spec.inclusiveEnd ? 1 : -1) - offset
+  var from = mapping.map(span.from + oldOffset, this.spec.inclusiveLeft ? -1 : 1) - offset
+  var to = mapping.map(span.to + oldOffset, this.spec.inclusiveRight ? 1 : -1) - offset
   return from >= to ? null : new Decoration(from, to, this)
 };
 
@@ -148,17 +138,17 @@ Decoration.widget = function (pos, dom, spec) {
 //
 // spec::- These options are recognized:
 //
-//   inclusiveStart:: ?bool
+//   inclusiveLeft:: ?bool
 //   Determines how the left side of the decoration is
 //   [mapped](#transform.Position_Mapping) when content is
 //   inserted directly at that positon. By default, the decoration
 //   won't include the new content, but you can set this to `true`
 //   to make it inclusive.
 //
-//   inclusiveEnd:: ?bool
+//   inclusiveRight:: ?bool
 //   Determines how the right side of the decoration is mapped.
 //   See
-//   [`inclusiveStart`](#view.Decoration^inline^spec.inclusiveStart).
+//   [`inclusiveLeft`](#view.Decoration^inline^spec.inclusiveLeft).
 Decoration.inline = function (from, to, attrs, spec) {
   return new Decoration(from, to, new InlineType(attrs, spec))
 };

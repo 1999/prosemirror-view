@@ -823,18 +823,15 @@ function renderDescs(parentDOM, descs) {
     } else {
       parentDOM.insertBefore(childDOM, dom)
     }
-    if (desc instanceof MarkViewDesc) {
-      var pos = dom ? dom.previousSibling : parentDOM.lastChild
-      renderDescs(desc.contentDOM, desc.children)
-      dom = pos ? pos.nextSibling : parentDOM.firstChild
-    }
+    if (desc instanceof MarkViewDesc)
+      { renderDescs(desc.contentDOM, desc.children) }
   }
   while (dom) { dom = rm(dom) }
 }
 
-function OuterDecoLevel(nodeName) {
+var OuterDecoLevel = function(nodeName) {
   if (nodeName) { this.nodeName = nodeName }
-}
+};
 OuterDecoLevel.prototype = Object.create(null)
 
 var noDeco = [new OuterDecoLevel]

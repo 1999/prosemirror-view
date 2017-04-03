@@ -8,10 +8,11 @@ var domIndex = ref$1.domIndex;
 
 function moveSelectionBlock(state, dir) {
   var ref = state.selection;
-  var $anchor = ref.$anchor;
-  var $head = ref.$head;
-  var $side = dir > 0 ? $anchor.max($head) : $anchor.min($head)
-  var $start = !$side.parent.inlineContent ? $side : $side.depth ? state.doc.resolve(dir > 0 ? $side.after() : $side.before()) : null
+  var $from = ref.$from;
+  var $to = ref.$to;
+  var node = ref.node;
+  var $side = dir > 0 ? $to : $from
+  var $start = node && node.isBlock ? $side : $side.depth ? state.doc.resolve(dir > 0 ? $side.after() : $side.before()) : null
   return $start && Selection.findFrom($start, dir)
 }
 
@@ -21,27 +22,32 @@ function apply(view, sel) {
 }
 
 function selectHorizontally(view, dir) {
-  var sel = view.state.selection
-  if (sel instanceof TextSelection) {
-    if (!sel.empty) {
-      return false
-    } else if (view.endOfTextblock(dir > 0 ? "right" : "left")) {
-      var next = moveSelectionBlock(view.state, dir)
-      if (next && (next instanceof NodeSelection)) { return apply(view, next) }
-      return false
-    } else {
-      var $head = sel.$head, node = $head.textOffset ? null : dir < 0 ? $head.nodeBefore : $head.nodeAfter
-      if (node && NodeSelection.isSelectable(node))
-        { return apply(view, new NodeSelection(dir < 0 ? view.state.doc.resolve($head.pos - node.nodeSize) : $head)) }
-      return false
-    }
-  } else if (sel instanceof NodeSelection && sel.node.isInline) {
-    return apply(view, new TextSelection(dir > 0 ? sel.$to : sel.$from))
-  } else {
-    var next$1 = moveSelectionBlock(view.state, dir)
-    if (next$1) { return apply(view, next$1) }
+  var ref = view.state.selection;
+  var $cursor = ref.$cursor;
+  var node = ref.node;
+  var $from = ref.$from;
+  var $to = ref.$to;
+  if (!$cursor && !node) { return false }
+
+  if (node && node.isInline)
+    { return apply(view, new TextSelection(dir > 0 ? $to : $from)) }
+
+  if (!node && !view.endOfTextblock(dir > 0 ? "right" : "left")) {
+    var ref$1 = dir > 0
+        ? $from.parent.childAfter($from.parentOffset)
+        : $from.parent.childBefore($from.parentOffset);
+    var nextNode = ref$1.node;
+    var offset = ref$1.offset;
+    if (nextNode && NodeSelection.isSelectable(nextNode) && offset == $from.parentOffset - (dir > 0 ? 0 : nextNode.nodeSize))
+      { return apply(view, new NodeSelection(dir < 0 ? view.state.doc.resolve($from.pos - nextNode.nodeSize) : $from)) }
     return false
   }
+
+  var next = moveSelectionBlock(view.state, dir)
+  if (next && (next instanceof NodeSelection || node))
+    { return apply(view, next) }
+
+  return false
 }
 
 function nodeLen(node) {
@@ -154,21 +160,27 @@ function setSel(sel, node, offset) {
 // selections. If so, apply it (if not, the result is left to the
 // browser)
 function selectVertically(view, dir) {
-  var sel = view.state.selection
-  if (sel instanceof TextSelection && !sel.empty) { return false }
-  var $from = sel.$from;
-  var $to = sel.$to;
+  var ref = view.state.selection;
+  var $cursor = ref.$cursor;
+  var node = ref.node;
+  var $from = ref.$from;
+  var $to = ref.$to;
+  if (!$cursor && !node) { return false }
 
-  if (!$from.parent.inlineContent || view.endOfTextblock(dir < 0 ? "up" : "down")) {
+  var leavingTextblock = true, $start = dir < 0 ? $from : $to
+  if (!node || node.isInline)
+    { leavingTextblock = view.endOfTextblock(dir < 0 ? "up" : "down") }
+
+  if (leavingTextblock) {
     var next = moveSelectionBlock(view.state, dir)
     if (next && (next instanceof NodeSelection))
       { return apply(view, next) }
   }
-  if (!$from.parent.inlineContent) {
-    var beyond = Selection.findFrom(dir < 0 ? $from : $to, dir)
-    return beyond ? apply(view, beyond) : true
-  }
-  return false
+
+  if (!node || node.isInline) { return false }
+
+  var beyond = Selection.findFrom($start, dir)
+  return beyond ? apply(view, beyond) : true
 }
 
 function stopNativeHorizontalDelete(view, dir) {

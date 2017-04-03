@@ -3,7 +3,7 @@ const {Selection, NodeSelection, TextSelection} = require("prosemirror-state")
 const browser = require("./browser")
 const {captureKeyDown} = require("./capturekeys")
 const {DOMChange} = require("./domchange")
-const {fromClipboard, toClipboard} = require("./clipboard")
+const {fromClipboard, toClipboard, canUpdateClipboard} = require("./clipboard")
 const {TrackMappings} = require("./trackmappings")
 const {DOMObserver} = require("./domobserver")
 const {selectionBetween} = require("./selection")
@@ -41,8 +41,8 @@ function destroyInput(view) {
 exports.destroyInput = destroyInput
 
 function ensureListeners(view) {
-  view.someProp("handleDOMEvents", currentHandlers => {
-    for (let type in currentHandlers) if (!view.extraHandlers[type] && !handlers.hasOwnProperty(type)) {
+  view.someProp("handleDOMEvents", handlers => {
+    for (let type in handlers) if (!view.extraHandlers[type] && !handlers.hasOwnProperty(type)) {
       view.extraHandlers[type] = true
       view.dom.addEventListener(type, event => runCustomHandler(view, event))
     }
@@ -53,7 +53,7 @@ exports.ensureListeners = ensureListeners
 function runCustomHandler(view, event) {
   return view.someProp("handleDOMEvents", handlers => {
     let handler = handlers[event.type]
-    return handler ? handler(view, event) || event.defaultPrevented : false
+    return handler ? handler(view, event) : false
   })
 }
 
@@ -96,10 +96,10 @@ editHandlers.keypress = (view, event) => {
     return
   }
 
-  let sel = view.state.selection
-  if (!(sel instanceof TextSelection) || !sel.$from.sameParent(sel.$to)) {
+  let {node, $from, $to} = view.state.selection
+  if (node || !$from.sameParent($to) || !(view.state.selection instanceof TextSelection)) {
     let text = String.fromCharCode(event.charCode)
-    if (!view.someProp("handleTextInput", f => f(view, sel.$from.pos, sel.$to.pos, text)))
+    if (!view.someProp("handleTextInput", f => f(view, $from.pos, $to.pos, text)))
       view.dispatch(view.state.tr.insertText(text).scrollIntoView())
     event.preventDefault()
   }
@@ -144,16 +144,15 @@ function selectClickedLeaf(view, inside) {
 
 function selectClickedNode(view, inside) {
   if (inside == -1) return false
-  let sel = view.state.selection, selectedNode, selectAt
-  if (sel instanceof NodeSelection) selectedNode = sel.node
+  let {node: selectedNode, $from} = view.state.selection, selectAt
 
   let $pos = view.state.doc.resolve(inside)
   for (let i = $pos.depth + 1; i > 0; i--) {
     let node = i > $pos.depth ? $pos.nodeAfter : $pos.node(i)
     if (NodeSelection.isSelectable(node)) {
-      if (selectedNode && sel.$from.depth > 0 &&
-          i >= sel.$from.depth && $pos.before(sel.$from.depth + 1) == sel.$from.pos)
-        selectAt = $pos.before(sel.$from.depth)
+      if (selectedNode && $from.depth > 0 &&
+          i >= $from.depth && $pos.before($from.depth + 1) == $from.pos)
+        selectAt = $pos.before($from.depth)
       else
         selectAt = $pos.before(i)
       break
@@ -255,11 +254,7 @@ class MouseDown {
       targetPos = $pos.depth ? $pos.before() : 0
     }
 
-    this.mightDrag = null
-    if (targetNode.type.spec.draggable ||
-        view.state.selection instanceof NodeSelection && targetNode == view.state.selection.node)
-      this.mightDrag = {node: targetNode, pos: targetPos}
-
+    this.mightDrag = (targetNode.type.spec.draggable || targetNode == view.state.selection.node) ? {node: targetNode, pos: targetPos} : null
     this.target = flushed ? null : event.target
     if (this.target && this.mightDrag) {
       this.view.domObserver.stop()
@@ -360,14 +355,13 @@ editHandlers.input = view => DOMChange.start(view)
 handlers.copy = editHandlers.cut = (view, e) => {
   let sel = view.state.selection, cut = e.type == "cut"
   if (sel.empty) return
-  // IE and Edge's clipboard interface is completely broken
-  if (!e.clipboardData || browser.ie) {
+  if (!e.clipboardData || !canUpdateClipboard(e.clipboardData)) {
     if (cut && browser.ie && browser.ie_version <= 11) DOMChange.start(view)
     return
   }
-  e.preventDefault()
   toClipboard(view, sel, e.clipboardData)
-  if (cut) view.dispatch(view.state.tr.deleteSelection().scrollIntoView())
+  e.preventDefault()
+  if (cut) view.dispatch(view.state.tr.deleteRange(sel.from, sel.to).scrollIntoView())
 }
 
 function sliceSingleNode(slice) {
@@ -380,15 +374,13 @@ editHandlers.paste = (view, e) => {
     return
   }
   let slice = fromClipboard(view, e.clipboardData, view.shiftKey, view.state.selection.$from)
-  if (!slice) return
-  e.preventDefault()
-
-  view.someProp("transformPasted", f => { slice = f(slice) })
-  if (view.someProp("handlePaste", f => f(view, e, slice))) return
-
-  let singleNode = sliceSingleNode(slice)
-  let tr = singleNode ? view.state.tr.replaceSelectionWith(singleNode) : view.state.tr.replaceSelection(slice)
-  view.dispatch(tr.scrollIntoView())
+  if (slice) {
+    e.preventDefault()
+    view.someProp("transformPasted", f => { slice = f(slice) })
+    let singleNode = sliceSingleNode(slice)
+    let tr = singleNode ? view.state.tr.replaceSelectionWith(singleNode) : view.state.tr.replaceSelection(slice)
+    view.dispatch(tr.scrollIntoView())
+  }
 }
 
 class Dragging {
@@ -447,12 +439,6 @@ handlers.dragend = view => {
 
 editHandlers.dragover = editHandlers.dragenter = (_, e) => e.preventDefault()
 
-function movedFrom(view, dragging) {
-  if (!dragging || !dragging.move) return null
-  let mapping = dragging.move.getMapping(view.state)
-  return mapping && {from: mapping.map(dragging.range.from, 1), to: mapping.map(dragging.range.to, -1)}
-}
-
 editHandlers.drop = (view, e) => {
   let dragging = view.dragging
   clearDragging(view)
@@ -463,15 +449,15 @@ editHandlers.drop = (view, e) => {
   if (!$mouse) return
   let slice = dragging && dragging.slice || fromClipboard(view, e.dataTransfer, false, $mouse)
   if (!slice) return
-
-  e.preventDefault()
-  view.someProp("transformPasted", f => { slice = f(slice) })
-  if (view.someProp("handleDrop", e, slice, movedFrom(view, dragging))) return
   let insertPos = dropPos(slice, view.state.doc.resolve($mouse.pos))
 
-  let tr = view.state.tr, moved = movedFrom(view, dragging)
-  if (moved) tr.deleteRange(moved.from, moved.to)
-
+  e.preventDefault()
+  let tr = view.state.tr
+  if (dragging && dragging.move) {
+    let {from, to} = dragging.range, mapping = dragging.move.getMapping(view.state)
+    if (mapping) tr.deleteRange(mapping.map(from, 1), mapping.map(to, -1))
+  }
+  view.someProp("transformPasted", f => { slice = f(slice) })
   let pos = tr.mapping.map(insertPos)
   let isNode = slice.openLeft == 0 && slice.openRight == 0 && slice.content.childCount == 1
   if (isNode)

@@ -171,7 +171,6 @@ function posFromCaret(view, node, offset, coords) {
   for (var cur = node;;) {
     if (cur == view.dom) { break }
     var desc = view.docView.nearestDesc(cur, true)
-    if (!desc) { return null }
     if (desc.node.isBlock) {
       var rect = desc.dom.getBoundingClientRect()
       if (rect.left > coords.left || rect.top > coords.top) { outside = desc.posBefore }
@@ -188,13 +187,14 @@ function posAtCoords(view, coords) {
   var root = view.root, node, offset
   if (root.caretPositionFromPoint) {
     var pos$1 = root.caretPositionFromPoint(coords.left, coords.top)
-    if (pos$1) { var assign;
-      ((assign = pos$1, node = assign.offsetNode, offset = assign.offset)) }
-  }
-  if (!node && root.caretRangeFromPoint) {
+    if (!pos$1) { return null
+    ;var assign;
+     }((assign = pos$1, node = assign.offsetNode, offset = assign.offset))
+  } else if (root.caretRangeFromPoint) {
     var range = root.caretRangeFromPoint(coords.left, coords.top)
-    if (range) { var assign$1;
-      ((assign$1 = range, node = assign$1.startContainer, offset = assign$1.startOffset)) }
+    if (!range) { return null
+    ;var assign$1;
+     }((assign$1 = range, node = assign$1.startContainer, offset = assign$1.startOffset))
   }
 
   var elt = root.elementFromPoint(coords.left, coords.top + 1)
@@ -265,8 +265,7 @@ function withFlushedState(view, state, f) {
 // Whether vertical position motion in a given direction
 // from a position would leave a text block.
 function endOfTextblockVertical(view, state, dir) {
-  var sel = state.selection
-  var $pos = dir == "up" ? sel.$anchor.min(sel.$head) : sel.$anchor.max(sel.$head)
+  var $pos = dir == "up" ? state.selection.$from : state.selection.$to
   if (!$pos.depth) { return false }
   return withFlushedState(view, state, function () {
     var dom = view.docView.domAfterPos($pos.before())

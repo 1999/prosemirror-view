@@ -1,38 +1,95 @@
 {
-  "name": "prosemirror-view",
-  "version": "0.19.1",
-  "description": "ProseMirror's view component",
-  "main": "dist/index.js",
-  "style": "style/prosemirror.css",
-  "license": "MIT",
-  "maintainers": [
-    {
-      "name": "Marijn Haverbeke",
-      "email": "marijnh@gmail.com",
-      "web": "http://marijnhaverbeke.nl"
-    }
+  "_args": [
+    [
+      {
+        "raw": "prosemirror-view@^0.19.1",
+        "scope": null,
+        "escapedName": "prosemirror-view",
+        "name": "prosemirror-view",
+        "rawSpec": "^0.19.1",
+        "spec": ">=0.19.1 <0.20.0",
+        "type": "range"
+      },
+      "/Users/eshvedai/Code/atlaskit/packages/editor-core"
+    ]
   ],
-  "repository": {
-    "type": "git",
-    "url": "git://github.com/prosemirror/prosemirror-view.git"
+  "_from": "prosemirror-view@>=0.19.1 <0.20.0",
+  "_id": "prosemirror-view@0.19.1",
+  "_inCache": true,
+  "_location": "/prosemirror-view",
+  "_nodeVersion": "6.9.1",
+  "_npmOperationalInternal": {
+    "host": "packages-18-east.internal.npmjs.com",
+    "tmp": "tmp/prosemirror-view-0.19.1.tgz_1489871772539_0.9036233832594007"
+  },
+  "_npmUser": {
+    "name": "marijn",
+    "email": "marijnh@gmail.com"
+  },
+  "_npmVersion": "3.10.8",
+  "_phantomChildren": {},
+  "_requested": {
+    "raw": "prosemirror-view@^0.19.1",
+    "scope": null,
+    "escapedName": "prosemirror-view",
+    "name": "prosemirror-view",
+    "rawSpec": "^0.19.1",
+    "spec": ">=0.19.1 <0.20.0",
+    "type": "range"
+  },
+  "_requiredBy": [
+    "#USER",
+    "/"
+  ],
+  "_resolved": "https://registry.npmjs.org/prosemirror-view/-/prosemirror-view-0.19.1.tgz",
+  "_shasum": "edf5d01a8bbb2a956c96e8bf86ceaf7dfacdb2e6",
+  "_shrinkwrap": null,
+  "_spec": "prosemirror-view@^0.19.1",
+  "_where": "/Users/eshvedai/Code/atlaskit/packages/editor-core",
+  "bugs": {
+    "url": "https://github.com/prosemirror/prosemirror-view/issues"
   },
   "dependencies": {
     "prosemirror-model": "^0.19.0",
     "prosemirror-state": "^0.19.0",
     "prosemirror-transform": "^0.19.0"
   },
+  "description": "ProseMirror's view component",
   "devDependencies": {
     "buble": "^0.15.1",
     "ist": "^1.0.0",
     "mocha": "^3.0.2",
     "moduleserve": "^0.7.0",
-    "rimraf": "^2.5.4",
-    "prosemirror-test-builder": "^0.19.0"
+    "rimraf": "^2.5.4"
+  },
+  "directories": {},
+  "dist": {
+    "shasum": "edf5d01a8bbb2a956c96e8bf86ceaf7dfacdb2e6",
+    "tarball": "https://registry.npmjs.org/prosemirror-view/-/prosemirror-view-0.19.1.tgz"
+  },
+  "gitHead": "62256b9e427e358ee40ca7585ed4e32c7da94493",
+  "homepage": "https://github.com/prosemirror/prosemirror-view#readme",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "maintainers": [
+    {
+      "name": "marijn",
+      "email": "marijnh@gmail.com"
+    }
+  ],
+  "name": "prosemirror-view",
+  "optionalDependencies": {},
+  "readme": "ERROR: No README data found!",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/prosemirror/prosemirror-view.git"
   },
   "scripts": {
-    "test": "FIXME autorun browser tests",
-    "test-server": "moduleserve test --port 8090",
     "build": "rimraf dist && buble -i src -o dist --no-named-function-expr",
-    "prepublish": "npm run build"
-  }
+    "prepublish": "npm run build",
+    "test": "FIXME autorun browser tests",
+    "test-server": "moduleserve test --port 8090"
+  },
+  "style": "style/prosemirror.css",
+  "version": "0.19.1"
 }

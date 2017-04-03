@@ -11,6 +11,7 @@ var DOMChange = ref$2.DOMChange;
 var ref$3 = require("./clipboard");
 var fromClipboard = ref$3.fromClipboard;
 var toClipboard = ref$3.toClipboard;
+var canUpdateClipboard = ref$3.canUpdateClipboard;
 var ref$4 = require("./trackmappings");
 var TrackMappings = ref$4.TrackMappings;
 var ref$5 = require("./domobserver");
@@ -53,8 +54,8 @@ function destroyInput(view) {
 exports.destroyInput = destroyInput
 
 function ensureListeners(view) {
-  view.someProp("handleDOMEvents", function (currentHandlers) {
-    for (var type in currentHandlers) { if (!view.extraHandlers[type] && !handlers.hasOwnProperty(type)) {
+  view.someProp("handleDOMEvents", function (handlers) {
+    for (var type in handlers) { if (!view.extraHandlers[type] && !handlers.hasOwnProperty(type)) {
       view.extraHandlers[type] = true
       view.dom.addEventListener(type, function (event) { return runCustomHandler(view, event); })
     } }
@@ -65,7 +66,7 @@ exports.ensureListeners = ensureListeners
 function runCustomHandler(view, event) {
   return view.someProp("handleDOMEvents", function (handlers) {
     var handler = handlers[event.type]
-    return handler ? handler(view, event) || event.defaultPrevented : false
+    return handler ? handler(view, event) : false
   })
 }
 
@@ -108,10 +109,13 @@ editHandlers.keypress = function (view, event) {
     return
   }
 
-  var sel = view.state.selection
-  if (!(sel instanceof TextSelection) || !sel.$from.sameParent(sel.$to)) {
+  var ref = view.state.selection;
+  var node = ref.node;
+  var $from = ref.$from;
+  var $to = ref.$to;
+  if (node || !$from.sameParent($to) || !(view.state.selection instanceof TextSelection)) {
     var text = String.fromCharCode(event.charCode)
-    if (!view.someProp("handleTextInput", function (f) { return f(view, sel.$from.pos, sel.$to.pos, text); }))
+    if (!view.someProp("handleTextInput", function (f) { return f(view, $from.pos, $to.pos, text); }))
       { view.dispatch(view.state.tr.insertText(text).scrollIntoView()) }
     event.preventDefault()
   }
@@ -162,16 +166,18 @@ function selectClickedLeaf(view, inside) {
 
 function selectClickedNode(view, inside) {
   if (inside == -1) { return false }
-  var sel = view.state.selection, selectedNode, selectAt
-  if (sel instanceof NodeSelection) { selectedNode = sel.node }
+  var ref = view.state.selection;
+  var selectedNode = ref.node;
+  var $from = ref.$from;
+  var selectAt
 
   var $pos = view.state.doc.resolve(inside)
   for (var i = $pos.depth + 1; i > 0; i--) {
     var node = i > $pos.depth ? $pos.nodeAfter : $pos.node(i)
     if (NodeSelection.isSelectable(node)) {
-      if (selectedNode && sel.$from.depth > 0 &&
-          i >= sel.$from.depth && $pos.before(sel.$from.depth + 1) == sel.$from.pos)
-        { selectAt = $pos.before(sel.$from.depth) }
+      if (selectedNode && $from.depth > 0 &&
+          i >= $from.depth && $pos.before($from.depth + 1) == $from.pos)
+        { selectAt = $pos.before($from.depth) }
       else
         { selectAt = $pos.before(i) }
       break
@@ -274,11 +280,7 @@ var MouseDown = function(view, pos, event, flushed) {
     targetPos = $pos.depth ? $pos.before() : 0
   }
 
-  this.mightDrag = null
-  if (targetNode.type.spec.draggable ||
-      view.state.selection instanceof NodeSelection && targetNode == view.state.selection.node)
-    { this.mightDrag = {node: targetNode, pos: targetPos} }
-
+  this.mightDrag = (targetNode.type.spec.draggable || targetNode == view.state.selection.node) ? {node: targetNode, pos: targetPos} : null
   this.target = flushed ? null : event.target
   if (this.target && this.mightDrag) {
     this.view.domObserver.stop()
@@ -378,14 +380,13 @@ editHandlers.input = function (view) { return DOMChange.start(view); }
 handlers.copy = editHandlers.cut = function (view, e) {
   var sel = view.state.selection, cut = e.type == "cut"
   if (sel.empty) { return }
-  // IE and Edge's clipboard interface is completely broken
-  if (!e.clipboardData || browser.ie) {
+  if (!e.clipboardData || !canUpdateClipboard(e.clipboardData)) {
     if (cut && browser.ie && browser.ie_version <= 11) { DOMChange.start(view) }
     return
   }
-  e.preventDefault()
   toClipboard(view, sel, e.clipboardData)
-  if (cut) { view.dispatch(view.state.tr.deleteSelection().scrollIntoView()) }
+  e.preventDefault()
+  if (cut) { view.dispatch(view.state.tr.deleteRange(sel.from, sel.to).scrollIntoView()) }
 }
 
 function sliceSingleNode(slice) {
@@ -398,15 +399,13 @@ editHandlers.paste = function (view, e) {
     return
   }
   var slice = fromClipboard(view, e.clipboardData, view.shiftKey, view.state.selection.$from)
-  if (!slice) { return }
-  e.preventDefault()
-
-  view.someProp("transformPasted", function (f) { slice = f(slice) })
-  if (view.someProp("handlePaste", function (f) { return f(view, e, slice); })) { return }
-
-  var singleNode = sliceSingleNode(slice)
-  var tr = singleNode ? view.state.tr.replaceSelectionWith(singleNode) : view.state.tr.replaceSelection(slice)
-  view.dispatch(tr.scrollIntoView())
+  if (slice) {
+    e.preventDefault()
+    view.someProp("transformPasted", function (f) { slice = f(slice) })
+    var singleNode = sliceSingleNode(slice)
+    var tr = singleNode ? view.state.tr.replaceSelectionWith(singleNode) : view.state.tr.replaceSelection(slice)
+    view.dispatch(tr.scrollIntoView())
+  }
 }
 
 var Dragging = function(state, slice, range, move) {
@@ -463,12 +462,6 @@ handlers.dragend = function (view) {
 
 editHandlers.dragover = editHandlers.dragenter = function (_, e) { return e.preventDefault(); }
 
-function movedFrom(view, dragging) {
-  if (!dragging || !dragging.move) { return null }
-  var mapping = dragging.move.getMapping(view.state)
-  return mapping && {from: mapping.map(dragging.range.from, 1), to: mapping.map(dragging.range.to, -1)}
-}
-
 editHandlers.drop = function (view, e) {
   var dragging = view.dragging
   clearDragging(view)
@@ -479,15 +472,18 @@ editHandlers.drop = function (view, e) {
   if (!$mouse) { return }
   var slice = dragging && dragging.slice || fromClipboard(view, e.dataTransfer, false, $mouse)
   if (!slice) { return }
-
-  e.preventDefault()
-  view.someProp("transformPasted", function (f) { slice = f(slice) })
-  if (view.someProp("handleDrop", e, slice, movedFrom(view, dragging))) { return }
   var insertPos = dropPos(slice, view.state.doc.resolve($mouse.pos))
 
-  var tr = view.state.tr, moved = movedFrom(view, dragging)
-  if (moved) { tr.deleteRange(moved.from, moved.to) }
-
+  e.preventDefault()
+  var tr = view.state.tr
+  if (dragging && dragging.move) {
+    var ref = dragging.range;
+    var from = ref.from;
+    var to = ref.to;
+    var mapping = dragging.move.getMapping(view.state)
+    if (mapping) { tr.deleteRange(mapping.map(from, 1), mapping.map(to, -1)) }
+  }
+  view.someProp("transformPasted", function (f) { slice = f(slice) })
   var pos = tr.mapping.map(insertPos)
   var isNode = slice.openLeft == 0 && slice.openRight == 0 && slice.content.childCount == 1
   if (isNode)

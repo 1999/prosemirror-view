@@ -1,28 +1,26 @@
 var ref = require("prosemirror-model");
 var Mark = ref.Mark;
-var ref$1 = require("prosemirror-state");
-var NodeSelection = ref$1.NodeSelection;
 
-var ref$2 = require("./domcoords");
-var scrollRectIntoView = ref$2.scrollRectIntoView;
-var posAtCoords = ref$2.posAtCoords;
-var coordsAtPos = ref$2.coordsAtPos;
-var endOfTextblock = ref$2.endOfTextblock;
-var storeScrollPos = ref$2.storeScrollPos;
-var resetScrollPos = ref$2.resetScrollPos;
-var ref$3 = require("./viewdesc");
-var docViewDesc = ref$3.docViewDesc;
-var ref$4 = require("./input");
-var initInput = ref$4.initInput;
-var destroyInput = ref$4.destroyInput;
-var dispatchEvent = ref$4.dispatchEvent;
-var ensureListeners = ref$4.ensureListeners;
-var ref$5 = require("./selection");
-var SelectionReader = ref$5.SelectionReader;
-var selectionToDOM = ref$5.selectionToDOM;
-var ref$6 = require("./decoration");
-var Decoration = ref$6.Decoration;
-var viewDecorations = ref$6.viewDecorations;var assign;
+var ref$1 = require("./domcoords");
+var scrollRectIntoView = ref$1.scrollRectIntoView;
+var posAtCoords = ref$1.posAtCoords;
+var coordsAtPos = ref$1.coordsAtPos;
+var endOfTextblock = ref$1.endOfTextblock;
+var storeScrollPos = ref$1.storeScrollPos;
+var resetScrollPos = ref$1.resetScrollPos;
+var ref$2 = require("./viewdesc");
+var docViewDesc = ref$2.docViewDesc;
+var ref$3 = require("./input");
+var initInput = ref$3.initInput;
+var destroyInput = ref$3.destroyInput;
+var dispatchEvent = ref$3.dispatchEvent;
+var ensureListeners = ref$3.ensureListeners;
+var ref$4 = require("./selection");
+var SelectionReader = ref$4.SelectionReader;
+var selectionToDOM = ref$4.selectionToDOM;
+var ref$5 = require("./decoration");
+var Decoration = ref$5.Decoration;
+var viewDecorations = ref$5.viewDecorations;var assign;
 ((assign = require("./decoration"), exports.Decoration = assign.Decoration, exports.DecorationSet = assign.DecorationSet))
 
 // ::- An editor view manages the DOM structure that represents an
@@ -139,7 +137,7 @@ EditorView.prototype.updateState = function (state) {
   this.updatePluginViews(prev)
 
   if (scrollToSelection) {
-    if (state.selection instanceof NodeSelection)
+    if (state.selection.node)
       { scrollRectIntoView(this, this.docView.domAfterPos(state.selection.from).getBoundingClientRect()) }
     else
       { scrollRectIntoView(this, this.coordsAtPos(state.selection.head)) }
@@ -174,7 +172,9 @@ EditorView.prototype.updatePluginViews = function (prevState) {
 // :: () → bool
 // Query whether the view has focus.
 EditorView.prototype.hasFocus = function () {
-  return this.root.activeElement == this.dom
+  if (this.editable && this.root.activeElement != this.dom) { return false }
+  var sel = this.root.getSelection()
+  return sel.rangeCount && this.dom.contains(sel.anchorNode.nodeType == 3 ? sel.anchorNode.parentNode : sel.anchorNode)
 };
 
 // :: (string, (prop: *) → *) → *
@@ -415,16 +415,6 @@ function getEditable(view) {
 //
 //   handleContextMenu:: ?(view: EditorView, pos: number, event: dom.MouseEvent) → bool
 //   Called when a context menu event is fired in the editor.
-//
-//   handlePaste:: ?(view: EditorView, event: dom.Event, slice: Slice) → bool
-//   Can be used to override the behavior of pasting. `slice` is the
-//   pasted content parsed by the editor, but you can directly access
-//   the event to get at the raw content.
-//
-//   handleDrop:: ?(view: EditorView, event: dom.Event, slice: Slice, moved: ?{from: number, to: number}) → bool
-//   Called when something is dropped on the editor. `moved` will
-//   point at the original range when this drop moves something inside
-//   the editor.
 //
 //   onFocus:: ?(view: EditorView, event: dom.Event)
 //   Called when the editor is focused.

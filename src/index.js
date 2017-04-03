@@ -1,5 +1,4 @@
 const {Mark} = require("prosemirror-model")
-const {NodeSelection} = require("prosemirror-state")
 
 const {scrollRectIntoView, posAtCoords, coordsAtPos, endOfTextblock, storeScrollPos, resetScrollPos} = require("./domcoords")
 const {docViewDesc} = require("./viewdesc")
@@ -123,7 +122,7 @@ class EditorView {
     this.updatePluginViews(prev)
 
     if (scrollToSelection) {
-      if (state.selection instanceof NodeSelection)
+      if (state.selection.node)
         scrollRectIntoView(this, this.docView.domAfterPos(state.selection.from).getBoundingClientRect())
       else
         scrollRectIntoView(this, this.coordsAtPos(state.selection.head))
@@ -156,7 +155,9 @@ class EditorView {
   // :: () → bool
   // Query whether the view has focus.
   hasFocus() {
-    return this.root.activeElement == this.dom
+    if (this.editable && this.root.activeElement != this.dom) return false
+    let sel = this.root.getSelection()
+    return sel.rangeCount && this.dom.contains(sel.anchorNode.nodeType == 3 ? sel.anchorNode.parentNode : sel.anchorNode)
   }
 
   // :: (string, (prop: *) → *) → *
@@ -393,16 +394,6 @@ function getEditable(view) {
 //
 //   handleContextMenu:: ?(view: EditorView, pos: number, event: dom.MouseEvent) → bool
 //   Called when a context menu event is fired in the editor.
-//
-//   handlePaste:: ?(view: EditorView, event: dom.Event, slice: Slice) → bool
-//   Can be used to override the behavior of pasting. `slice` is the
-//   pasted content parsed by the editor, but you can directly access
-//   the event to get at the raw content.
-//
-//   handleDrop:: ?(view: EditorView, event: dom.Event, slice: Slice, moved: ?{from: number, to: number}) → bool
-//   Called when something is dropped on the editor. `moved` will
-//   point at the original range when this drop moves something inside
-//   the editor.
 //
 //   onFocus:: ?(view: EditorView, event: dom.Event)
 //   Called when the editor is focused.

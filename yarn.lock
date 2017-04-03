@@ -284,25 +284,11 @@ path-is-absolute@^1.0.0:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/path-is-absolute/-/path-is-absolute-1.0.1.tgz#174b9268735534ffbc7ace6bf53a5a9e1b5c5f5f"
 
-prosemirror-model@^0.19.0, prosemirror-model@~0.19.0:
+prosemirror-model@^0.19.0:
   version "0.19.0"
   resolved "https://registry.yarnpkg.com/prosemirror-model/-/prosemirror-model-0.19.0.tgz#4593eeb7e4e6ba7c5727f3310c51be0583d1d9e3"
   dependencies:
     orderedmap "^1.0.0"
-
-prosemirror-schema-basic@~0.19.0:
-  version "0.19.0"
-  resolved "https://registry.yarnpkg.com/prosemirror-schema-basic/-/prosemirror-schema-basic-0.19.0.tgz#9fbd1438eb745957970f700820bc5a9331443696"
-  dependencies:
-    prosemirror-model "^0.19.0"
-
-prosemirror-schema-table@~0.19.0:
-  version "0.19.0"
-  resolved "https://registry.yarnpkg.com/prosemirror-schema-table/-/prosemirror-schema-table-0.19.0.tgz#13d6dfdd910833baaeb7e093a6349b30e0aa8374"
-  dependencies:
-    prosemirror-model "^0.19.0"
-    prosemirror-state "^0.19.0"
-    prosemirror-transform "^0.19.0"
 
 prosemirror-state@^0.19.0:
   version "0.19.1"
@@ -310,14 +296,6 @@ prosemirror-state@^0.19.0:
   dependencies:
     prosemirror-model "^0.19.0"
     prosemirror-transform "^0.19.0"
-
-prosemirror-test-builder@^0.19.0:
-  version "0.19.0"
-  resolved "https://registry.yarnpkg.com/prosemirror-test-builder/-/prosemirror-test-builder-0.19.0.tgz#ad6ade7b3ef06fa9aede9f958c25b962bd6b83e7"
-  dependencies:
-    prosemirror-model "~0.19.0"
-    prosemirror-schema-basic "~0.19.0"
-    prosemirror-schema-table "~0.19.0"
 
 prosemirror-transform@^0.19.0:
   version "0.19.0"
