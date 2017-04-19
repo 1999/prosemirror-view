@@ -50,7 +50,7 @@
     "url": "https://github.com/prosemirror/prosemirror-view/issues"
   },
   "dependencies": {
-    "prosemirror-model": "git://github.com/d4rkr00t/prosemirror-model.git#latest-patches",
+    "prosemirror-model": "git://github.com/d4rkr00t/prosemirror-model.git#99857dc0ef0fdbc29d5f6c2b49532c6c21f80a73",
     "prosemirror-state": "^0.19.0",
     "prosemirror-transform": "^0.19.0"
   },
